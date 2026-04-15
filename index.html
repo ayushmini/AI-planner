@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TimeBlocks — Visual Scheduler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── CSS Variables ─────────────────────────────────────────────── */
+  :root {
+    --bg:        #0d0d0f;
+    --surface:   #16161a;
+    --surface2:  #1e1e24;
+    --border:    #2a2a35;
+    --border2:   #3a3a48;
+    --text:      #e8e8f0;
+    --text2:     #8888a8;
+    --text3:     #55556a;
+    --accent:    #7c6aff;
+    --accent2:   #b69fff;
+    --green:     #3ddc97;
+    --red:       #ff5c7a;
+    --amber:     #ffc947;
+    --hour-h:    60px;
+    --sidebar-w: 320px;
+    --header-h:  52px;
+    --radius:    8px;
+    --radius-lg: 14px;
+    --shadow:    0 4px 24px rgba(0,0,0,.5);
+    --trans:     .18s cubic-bezier(.4,0,.2,1);
+  }
+  [data-theme="light"] {
+    --bg:       #f0f0f5;
+    --surface:  #ffffff;
+    --surface2: #f5f5fa;
+    --border:   #dddde8;
+    --border2:  #c8c8d8;
+    --text:     #18182a;
+    --text2:    #55557a;
+    --text3:    #9999b8;
+    --accent:   #5b4de0;
+    --accent2:  #8b7af5;
+    --shadow:   0 4px 24px rgba(0,0,0,.12);
+  }
+
+  /* ── Reset ─────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  button { cursor: pointer; font-family: inherit; }
+  input, select { font-family: inherit; }
+
+  /* ── Layout ────────────────────────────────────────────────────── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── Header ────────────────────────────────────────────────────── */
+  #header {
+    height: var(--header-h);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  #header .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    margin-right: 4px;
+  }
+  #header .logo span { color: var(--text2); font-weight: 400; }
+  .nav-btn {
+    width: 30px; height: 30px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: background var(--trans), color var(--trans);
+  }
+  .nav-btn:hover { background: var(--border); color: var(--text); }
+  #date-display {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    min-width: 120px;
+    text-align: center;
+    font-weight: 700;
+  }
+  #date-picker {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 4px 8px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  #date-picker:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #today-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: background var(--trans), color var(--trans);
+  }
+  #today-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .spacer { flex: 1; }
+  #theme-toggle {
+    width: 34px; height: 34px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-size: 17px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--trans);
+  }
+  #theme-toggle:hover { background: var(--border); color: var(--text); }
+
+  /* ── Main body ──────────────────────────────────────────────────── */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Timeline ───────────────────────────────────────────────────── */
+  #timeline-wrap {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    background: var(--bg);
+  }
+  #timeline-wrap::-webkit-scrollbar { width: 6px; }
+  #timeline-wrap::-webkit-scrollbar-track { background: transparent; }
+  #timeline-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  #timeline {
+    position: relative;
+    width: 100%;
+    height: calc(var(--hour-h) * 24);
+    padding-left: 56px;
+    cursor: crosshair;
+    user-select: none;
+  }
+
+  /* Hour lines & labels */
+  .hour-row {
+    position: absolute;
+    left: 0; right: 0;
+    display: flex;
+    align-items: flex-start;
+  }
+  .hour-label {
+    width: 52px;
+    text-align: right;
+    padding-right: 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    flex-shrink: 0;
+    margin-top: -7px;
+  }
+  .hour-line {
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+  .half-hour-line {
+    position: absolute;
+    left: 56px; right: 0;
+    border-top: 1px dashed var(--border);
+    opacity: .45;
+  }
+
+  /* Now line */
+  #now-line {
+    position: absolute;
+    left: 52px; right: 0;
+    border-top: 2px solid var(--red);
+    z-index: 5;
+    pointer-events: none;
+  }
+  #now-line::before {
+    content: '';
+    position: absolute;
+    left: -5px; top: -5px;
+    width: 9px; height: 9px;
+    background: var(--red);
+    border-radius: 50%;
+  }
+
+  /* Busy blocks */
+  .busy-block {
+    position: absolute;
+    left: 60px;
+    right: 8px;
+    border-radius: var(--radius);
+    padding: 5px 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: filter var(--trans), transform var(--trans), box-shadow var(--trans);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid rgba(255,255,255,.08);
+    z-index: 4;
+  }
+  .busy-block:hover {
+    filter: brightness(1.15);
+    transform: translateX(2px);
+    box-shadow: -3px 0 0 0 rgba(255,255,255,.2), var(--shadow);
+  }
+  .busy-block .blk-label {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(255,255,255,.95);
+  }
+  .busy-block .blk-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: rgba(255,255,255,.65);
+  }
+  .busy-block .blk-repeat {
+    font-size: 10px;
+    color: rgba(255,255,255,.55);
+  }
+
+  /* Drag-preview ghost */
+  #drag-preview {
+    position: absolute;
+    left: 60px; right: 8px;
+    background: var(--accent);
+    opacity: .35;
+    border-radius: var(--radius);
+    pointer-events: none;
+    z-index: 6;
+    border: 2px dashed var(--accent2);
+    display: none;
+  }
+
+  /* Free-time highlight on timeline */
+  .free-highlight {
+    position: absolute;
+    left: 58px; right: 6px;
+    background: rgba(61,220,151,.12);
+    border-left: 3px solid var(--green);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    z-index: 3;
+    pointer-events: none;
+    animation: fadeIn .3s ease;
+  }
+
+  /* ── Sidebar ────────────────────────────────────────────────────── */
+  #sidebar {
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  #sidebar::-webkit-scrollbar { width: 4px; }
+  #sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .sb-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sb-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sb-title .pill {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 20px;
+    padding: 1px 7px;
+    font-size: 9px;
+    letter-spacing: 0;
+    font-weight: 700;
+  }
+
+  /* Quick form */
+  .form-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .form-col { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .form-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: .3px;
+  }
+  .form-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    width: 100%;
+    transition: border-color var(--trans), box-shadow var(--trans);
+  }
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,255,.15);
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    width: 100%;
+    transition: background var(--trans), transform var(--trans);
+    margin-top: 4px;
+  }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  /* Free-time section */
+  .free-form-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  #free-results {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .free-day-group { }
+  .free-day-header {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 0 4px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .free-block-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: rgba(61,220,151,.07);
+    border: 1px solid rgba(61,220,151,.2);
+    border-radius: var(--radius);
+    font-size: 12px;
+  }
+  .free-block-item .fb-dot {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .free-block-item .fb-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    flex: 1;
+  }
+  .free-block-item .fb-dur {
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .free-status {
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .free-status.ok { background: rgba(61,220,151,.1); color: var(--green); }
+  .free-status.warn { background: rgba(255,92,122,.1); color: var(--red); }
+  .free-status.info { background: rgba(124,106,255,.1); color: var(--accent2); }
+
+  /* Blocks list */
+  .block-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: border-color var(--trans), background var(--trans);
+  }
+  .block-item:hover { border-color: var(--accent); background: var(--bg); }
+  .block-item .bi-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .block-item .bi-info { flex: 1; min-width: 0; }
+  .block-item .bi-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .block-item .bi-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+  }
+  .block-item .bi-repeat {
+    font-size: 10px;
+    color: var(--text3);
+  }
+  .block-item .bi-del {
+    width: 24px; height: 24px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text3);
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--trans), color var(--trans);
+    flex-shrink: 0;
+  }
+  .block-item .bi-del:hover { background: rgba(255,92,122,.15); color: var(--red); border-color: rgba(255,92,122,.3); }
+
+  .empty-state {
+    text-align: center;
+    color: var(--text3);
+    font-size: 12px;
+    padding: 20px 0;
+  }
+
+  /* ── Modal ──────────────────────────────────────────────────────── */
+  #modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  #modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+  }
+  #modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-lg);
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    box-shadow: var(--shadow), 0 0 0 1px rgba(255,255,255,.03);
+    transform: translateY(12px) scale(.97);
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  #modal-overlay.open #modal { transform: translateY(0) scale(1); }
+  #modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  #modal-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  #modal-close {
+    width: 28px; height: 28px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--trans);
+  }
+  #modal-close:hover { background: var(--border); color: var(--text); }
+  #modal-body { padding: 18px 20px; }
+  #modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    justify-content: flex-end;
+  }
+  .btn-cancel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background var(--trans);
+  }
+  .btn-cancel:hover { background: var(--border); color: var(--text); }
+  .btn-save {
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    color: #fff;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background var(--trans);
+  }
+  .btn-save:hover { background: var(--accent2); }
+  .btn-delete {
+    background: transparent;
+    border: 1px solid rgba(255,92,122,.35);
+    border-radius: var(--radius);
+    color: var(--red);
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-right: auto;
+    transition: background var(--trans);
+  }
+  .btn-delete:hover { background: rgba(255,92,122,.1); }
+
+  /* Color swatches */
+  .color-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .swatch {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform var(--trans), border-color var(--trans);
+    position: relative;
+  }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.active {
+    border-color: var(--text);
+    transform: scale(1.1);
+  }
+  .swatch.active::after {
+    content: '✓';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  /* Repeat day buttons */
+  .repeat-row {
+    display: flex;
+    gap: 5px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+  .day-btn {
+    width: 34px; height: 30px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-size: 11px;
+    font-weight: 700;
+    transition: background var(--trans), color var(--trans), border-color var(--trans);
+  }
+  .day-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .day-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  #every-day-btn {
+    padding: 0 10px;
+    width: auto;
+    font-size: 11px;
+  }
+
+  /* Modal form spacing */
+  #modal-body .form-row { margin-bottom: 14px; }
+  #modal-body .form-row:last-child { margin-bottom: 0; }
+
+  /* ── Toast ──────────────────────────────────────────────────────── */
+  #toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: toastIn .25s cubic-bezier(.34,1.56,.64,1);
+    max-width: 280px;
+  }
+  .toast.fade-out { animation: toastOut .2s ease forwards; }
+  .toast.success .ti { color: var(--green); }
+  .toast.error .ti { color: var(--red); }
+  .toast.info .ti { color: var(--accent); }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px) scale(.92); }
+    to   { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes toastOut {
+    to { opacity: 0; transform: translateX(20px); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ── Misc ───────────────────────────────────────────────────────── */
+  .sep { height: 1px; background: var(--border); margin: 10px 0; }
+  input[type="color"] {
+    height: 30px;
+    cursor: pointer;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2px 4px;
+    width: 100%;
+  }
+  .error-msg {
+    color: var(--red);
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  /* Scrollbar for main timeline */
+  #timeline-wrap { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Header -->
+  <header id="header">
+    <div class="logo">TIME<span>BLOCKS</span></div>
+    <button class="nav-btn" id="prev-day" title="Previous day">‹</button>
+    <div id="date-display">—</div>
+    <button class="nav-btn" id="next-day" title="Next day">›</button>
+    <input type="date" id="date-picker">
+    <button id="today-btn">Today</button>
+    <div class="spacer"></div>
+    <button id="theme-toggle" title="Toggle theme">☀</button>
+  </header>
+
+  <!-- Main -->
+  <div id="main">
+    <!-- Timeline -->
+    <div id="timeline-wrap">
+      <div id="timeline">
+        <div id="drag-preview"></div>
+        <div id="now-line" style="display:none"></div>
+        <!-- Hour rows injected by JS -->
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <!-- Quick Add -->
+      <div class="sb-section">
+        <div class="sb-title">Quick Add</div>
+        <div class="form-row">
+          <div class="form-col">
+            <label class="form-label">Start</label>
+            <input type="time" id="q-start" class="form-input" value="09:00">
+          </div>
+          <div class="form-col">
+            <label class="form-label">End</label>
+            <input type="time" id="q-end" class="form-input" value="10:00">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-col">
+            <label class="form-label">Label</label>
+            <input type="text" id="q-label" class="form-input" placeholder="Busy" maxlength="40">
+          </div>
+        </div>
+        <button class="btn-primary" id="q-add-btn">+ Add Block</button>
+      </div>
+
+      <!-- Find Free Time -->
+      <div class="sb-section">
+        <div class="sb-title">Find Free Time</div>
+        <div class="form-row">
+          <div class="form-col">
+            <label class="form-label">From date</label>
+            <input type="date" id="free-date" class="form-input">
+          </div>
+          <div class="form-col">
+            <label class="form-label">From time</label>
+            <input type="time" id="free-time" class="form-input" value="08:00">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-col">
+            <label class="form-label">Hours needed</label>
+            <input type="number" id="free-hours" class="form-input" min="0.25" step="0.25" value="2">
+          </div>
+        </div>
+        <button class="btn-primary" id="free-search-btn">Search</button>
+        <div id="free-results"></div>
+      </div>
+
+      <!-- Blocks List -->
+      <div class="sb-section" style="flex:1">
+        <div class="sb-title">Day's Blocks <span class="pill" id="blocks-count">0</span></div>
+        <div id="blocks-list"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-title">Add Block</div>
+      <button id="modal-close">✕</button>
+    </div>
+    <div id="modal-body">
+      <div class="form-row">
+        <div class="form-col">
+          <label class="form-label">Start time</label>
+          <input type="time" id="m-start" class="form-input">
+        </div>
+        <div class="form-col">
+          <label class="form-label">End time</label>
+          <input type="time" id="m-end" class="form-input">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-col">
+          <label class="form-label">Label</label>
+          <input type="text" id="m-label" class="form-input" placeholder="Busy" maxlength="40">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-col">
+          <label class="form-label">Color</label>
+          <div class="color-swatches" id="color-swatches"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-col">
+          <label class="form-label">Repeat</label>
+          <div class="repeat-row" id="repeat-row">
+            <button class="day-btn" id="every-day-btn" type="button">Every day</button>
+            <button class="day-btn" data-day="0" type="button">M</button>
+            <button class="day-btn" data-day="1" type="button">T</button>
+            <button class="day-btn" data-day="2" type="button">W</button>
+            <button class="day-btn" data-day="3" type="button">T</button>
+            <button class="day-btn" data-day="4" type="button">F</button>
+            <button class="day-btn" data-day="5" type="button">S</button>
+            <button class="day-btn" data-day="6" type="button">S</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="modal-footer">
+      <button class="btn-delete" id="modal-delete" style="display:none">Delete</button>
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-save" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toast-container"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────
+let currentDate = new Date();
+currentDate.setHours(0,0,0,0);
+let allSlots = [];          // all busy slots from server
+let freeResults = null;     // last free-time search result
+let editingSlotId = null;   // null = add mode, number = edit mode
+let selectedColor = '#d81b60';
+let selectedDays = [];      // repeat days for modal
+let dragStart = null;       // {y, minute}
+
+const COLORS = [
+  '#d81b60','#e65100','#f9a825','#2e7d32','#00695c',
+  '#0277bd','#4527a0','#6a1b9a','#37474f','#3ddc97'
+];
+const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// ── DOM refs ──────────────────────────────────────────────────────
+const timeline      = document.getElementById('timeline');
+const tWrap         = document.getElementById('timeline-wrap');
+const dateDisplay   = document.getElementById('date-display');
+const datePicker    = document.getElementById('date-picker');
+const blocksCount   = document.getElementById('blocks-count');
+const blocksList    = document.getElementById('blocks-list');
+const freeResults_  = document.getElementById('free-results');
+const nowLine       = document.getElementById('now-line');
+const dragPreview   = document.getElementById('drag-preview');
+const modalOverlay  = document.getElementById('modal-overlay');
+const modalTitle    = document.getElementById('modal-title');
+const modalSave     = document.getElementById('modal-save');
+const modalDelete   = document.getElementById('modal-delete');
+const mStart        = document.getElementById('m-start');
+const mEnd          = document.getElementById('m-end');
+const mLabel        = document.getElementById('m-label');
+const colorSwatches = document.getElementById('color-swatches');
+const repeatRow     = document.getElementById('repeat-row');
+const everyDayBtn   = document.getElementById('every-day-btn');
+
+// ── Helpers ───────────────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0'); }
+function dateStr(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function minutesToTime(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
+function timeToMinutes(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function topPx(m){ return m * (60/60); } // 1px per minute, 60px/hour
+function heightPx(m){ return Math.max(m, 15); }
+
+function formatDate(d){
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function isToday(d){
+  const n=new Date(); n.setHours(0,0,0,0);
+  return d.getTime()===n.getTime();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────
+function showToast(msg, type='info'){
+  const icons = {info:'ℹ', success:'✓', error:'✕'};
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<span class="ti">${icons[type]||'ℹ'}</span>${msg}`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>{ t.classList.add('fade-out'); setTimeout(()=>t.remove(),220); }, 2600);
+}
+
+// ── Build timeline grid ───────────────────────────────────────────
+function buildGrid(){
+  // Remove old hour rows & half-hour lines
+  timeline.querySelectorAll('.hour-row,.half-hour-line').forEach(e=>e.remove());
+  for(let h=0;h<24;h++){
+    const row = document.createElement('div');
+    row.className = 'hour-row';
+    row.style.top = `${h*60}px`;
+    row.innerHTML = `<span class="hour-label">${pad(h)}:00</span><div class="hour-line"></div>`;
+    timeline.appendChild(row);
+
+    if(h<24){
+      const hl = document.createElement('div');
+      hl.className = 'half-hour-line';
+      hl.style.top = `${h*60+30}px`;
+      timeline.appendChild(hl);
+    }
+  }
+}
+
+// ── Now line ──────────────────────────────────────────────────────
+function updateNowLine(){
+  if(!isToday(currentDate)){ nowLine.style.display='none'; return; }
+  const n=new Date();
+  const m = n.getHours()*60+n.getMinutes();
+  nowLine.style.display='block';
+  nowLine.style.top = `${m}px`;
+}
+
+// ── Fetch & render ────────────────────────────────────────────────
+async function fetchSlots(){
+  try {
+    const r = await fetch(`/api/slots?date=${dateStr(currentDate)}`);
+    const data = await r.json();
+    allSlots = data;
+    renderBlocks();
+    renderSidebar();
+    if(freeResults) reHighlightFree(freeResults);
+  } catch(e){ showToast('Failed to load slots','error'); }
+}
+
+function renderBlocks(){
+  timeline.querySelectorAll('.busy-block,.free-highlight').forEach(e=>e.remove());
+  // Group overlapping blocks for column layout
+  const sorted = [...allSlots].sort((a,b)=>a.startMinutes-b.startMinutes);
+  const columns = [];
+  for(const slot of sorted){
+    let placed = false;
+    for(let c=0;c<columns.length;c++){
+      const col = columns[c];
+      if(col[col.length-1].endMinutes <= slot.startMinutes){
+        col.push(slot); placed=true; break;
+      }
+    }
+    if(!placed) columns.push([slot]);
+  }
+  const totalCols = columns.length;
+  columns.forEach((col, ci)=>{
+    col.forEach(slot=>{
+      const el = document.createElement('div');
+      el.className = 'busy-block';
+      el.dataset.id = slot.id;
+      el.style.top = `${slot.startMinutes}px`;
+      el.style.height = `${heightPx(slot.endMinutes-slot.startMinutes)}px`;
+      el.style.background = slot.color;
+      if(totalCols > 1){
+        const w = (1/totalCols)*100;
+        el.style.left = `${60 + ci*(w*(timeline.clientWidth-68)/100)}px`;
+        el.style.right = `${(totalCols-ci-1)*(w*(timeline.clientWidth-68)/100) + 8}px`;
+      }
+      const repeatIcon = slot.repeatDays && slot.repeatDays.length ? ' 🔁' : '';
+      el.innerHTML = `
+        <div class="blk-label">${escHtml(slot.label||'Busy')}</div>
+        <div class="blk-time">${slot.start}–${slot.end}</div>
+        ${repeatIcon ? `<div class="blk-repeat">${repeatIcon} Repeating</div>` : ''}
+      `;
+      el.addEventListener('click', e=>{ e.stopPropagation(); openEditModal(slot); });
+      timeline.appendChild(el);
+    });
+  });
+}
+
+function reHighlightFree(result){
+  timeline.querySelectorAll('.free-highlight').forEach(e=>e.remove());
+  if(!result) return;
+  const ds = dateStr(currentDate);
+  result.allocated.filter(b=>b.date===ds).forEach(b=>{
+    const el = document.createElement('div');
+    el.className = 'free-highlight';
+    el.style.top = `${b.startMinutes}px`;
+    el.style.height = `${heightPx(b.endMinutes-b.startMinutes)}px`;
+    el.title = `Free: ${b.start}–${b.end}`;
+    timeline.appendChild(el);
+  });
+}
+
+function renderSidebar(){
+  blocksCount.textContent = allSlots.length;
+  if(!allSlots.length){
+    blocksList.innerHTML = '<div class="empty-state">No blocks for this day</div>';
+    return;
+  }
+  const sorted = [...allSlots].sort((a,b)=>a.startMinutes-b.startMinutes);
+  blocksList.innerHTML = '';
+  sorted.forEach(s=>{
+    const el = document.createElement('div');
+    el.className = 'block-item';
+    el.dataset.id = s.id;
+    const repeatStr = s.repeatDays&&s.repeatDays.length
+      ? `🔁 ${s.repeatDays.map(d=>DAY_NAMES[d]).join(', ')}`
+      : '';
+    el.innerHTML = `
+      <div class="bi-dot" style="background:${s.color}"></div>
+      <div class="bi-info">
+        <div class="bi-label">${escHtml(s.label||'Busy')}</div>
+        <div class="bi-time">${s.start} – ${s.end}</div>
+        ${repeatStr ? `<div class="bi-repeat">${repeatStr}</div>` : ''}
+      </div>
+      <button class="bi-del" data-id="${s.id}" title="Delete">✕</button>
+    `;
+    el.querySelector('.bi-del').addEventListener('click', e=>{
+      e.stopPropagation();
+      deleteSlot(s.id);
+    });
+    el.addEventListener('click', ()=>openEditModal(s));
+    blocksList.appendChild(el);
+  });
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Date navigation ───────────────────────────────────────────────
+function setDate(d){
+  currentDate = new Date(d); currentDate.setHours(0,0,0,0);
+  const ds = dateStr(currentDate);
+  dateDisplay.textContent = formatDate(currentDate);
+  datePicker.value = ds;
+  document.getElementById('free-date').value = ds;
+  fetchSlots();
+  updateNowLine();
+}
+
+document.getElementById('prev-day').addEventListener('click',()=>{
+  const d=new Date(currentDate); d.setDate(d.getDate()-1); setDate(d);
+});
+document.getElementById('next-day').addEventListener('click',()=>{
+  const d=new Date(currentDate); d.setDate(d.getDate()+1); setDate(d);
+});
+document.getElementById('today-btn').addEventListener('click',()=>setDate(new Date()));
+datePicker.addEventListener('change',e=>{ if(e.target.value) setDate(new Date(e.target.value+'T00:00:00')); });
+document.addEventListener('keydown',e=>{
+  if(modalOverlay.classList.contains('open')) return;
+  if(e.key==='ArrowLeft'){ document.getElementById('prev-day').click(); }
+  if(e.key==='ArrowRight'){ document.getElementById('next-day').click(); }
+  if(e.key==='t'||e.key==='T'){ document.getElementById('today-btn').click(); }
+});
+
+// ── Theme toggle ──────────────────────────────────────────────────
+const themeToggle = document.getElementById('theme-toggle');
+themeToggle.addEventListener('click',()=>{
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  document.documentElement.dataset.theme = isDark ? 'light' : 'dark';
+  themeToggle.textContent = isDark ? '☽' : '☀';
+});
+
+// ── Color swatches setup ──────────────────────────────────────────
+function buildSwatches(){
+  colorSwatches.innerHTML = '';
+  COLORS.forEach(c=>{
+    const s = document.createElement('div');
+    s.className = 'swatch' + (c===selectedColor?' active':'');
+    s.style.background = c;
+    s.dataset.color = c;
+    s.addEventListener('click',()=>{
+      selectedColor = c;
+      colorSwatches.querySelectorAll('.swatch').forEach(sw=>sw.classList.remove('active'));
+      s.classList.add('active');
+    });
+    colorSwatches.appendChild(s);
+  });
+}
+buildSwatches();
+
+// ── Day toggle buttons ────────────────────────────────────────────
+const dayBtns = repeatRow.querySelectorAll('[data-day]');
+dayBtns.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    btn.classList.toggle('active');
+    selectedDays = Array.from(dayBtns).filter(b=>b.classList.contains('active')).map(b=>+b.dataset.day);
+    everyDayBtn.classList.toggle('active', selectedDays.length===7);
+  });
+});
+everyDayBtn.addEventListener('click',()=>{
+  const allActive = selectedDays.length===7;
+  dayBtns.forEach(b=>b.classList.toggle('active',!allActive));
+  selectedDays = allActive ? [] : [0,1,2,3,4,5,6];
+  everyDayBtn.classList.toggle('active',!allActive);
+});
+
+// ── Modal helpers ─────────────────────────────────────────────────
+function openAddModal(startM=null, endM=null){
+  editingSlotId = null;
+  modalTitle.textContent = 'Add Block';
+  modalSave.textContent = 'Add';
+  modalDelete.style.display = 'none';
+  mStart.value = startM!=null ? minutesToTime(startM) : '09:00';
+  mEnd.value   = endM!=null   ? minutesToTime(Math.min(endM,1439)) : '10:00';
+  mLabel.value = '';
+  selectedColor = COLORS[0];
+  selectedDays = [];
+  buildSwatches();
+  dayBtns.forEach(b=>b.classList.remove('active'));
+  everyDayBtn.classList.remove('active');
+  openModal();
+}
+
+function openEditModal(slot){
+  editingSlotId = slot.id;
+  modalTitle.textContent = 'Edit Block';
+  modalSave.textContent = 'Save';
+  modalDelete.style.display = 'block';
+  mStart.value = slot.start;
+  mEnd.value   = slot.end;
+  mLabel.value = slot.label || '';
+  selectedColor = slot.color || COLORS[0];
+  selectedDays = slot.repeatDays ? [...slot.repeatDays] : [];
+  buildSwatches();
+  // Mark active color swatch
+  colorSwatches.querySelectorAll('.swatch').forEach(s=>{
+    s.classList.toggle('active', s.dataset.color===selectedColor);
+  });
+  dayBtns.forEach(b=>{
+    b.classList.toggle('active', selectedDays.includes(+b.dataset.day));
+  });
+  everyDayBtn.classList.toggle('active', selectedDays.length===7);
+  openModal();
+}
+
+function openModal(){ modalOverlay.classList.add('open'); mStart.focus(); }
+function closeModal(){ modalOverlay.classList.remove('open'); }
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', e=>{ if(e.target===modalOverlay) closeModal(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+// ── Save (add or update) ──────────────────────────────────────────
+modalSave.addEventListener('click', async ()=>{
+  const start = mStart.value, end = mEnd.value;
+  if(!start||!end){ showToast('Start and end required','error'); return; }
+  if(timeToMinutes(end)<=timeToMinutes(start)){ showToast('End must be after start','error'); return; }
+
+  const payload = {
+    start, end,
+    label: mLabel.value.trim() || 'Busy',
+    color: selectedColor,
+    repeatDays: selectedDays,
+    date: selectedDays.length ? null : dateStr(currentDate),
+  };
+
+  try {
+    let r;
+    if(editingSlotId!=null){
+      r = await fetch(`/api/slots/${editingSlotId}`,{ method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    } else {
+      r = await fetch('/api/slots',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+    }
+    if(!r.ok){ const d=await r.json(); showToast(d.error||'Error','error'); return; }
+    closeModal();
+    showToast(editingSlotId!=null ? 'Block updated' : 'Block added','success');
+    await fetchSlots();
+  } catch(e){ showToast('Network error','error'); }
+});
+
+// ── Delete ────────────────────────────────────────────────────────
+modalDelete.addEventListener('click', async ()=>{
+  if(editingSlotId==null) return;
+  await deleteSlot(editingSlotId);
+  closeModal();
+});
+
+async function deleteSlot(id){
+  try {
+    const r = await fetch(`/api/slots/${id}`,{method:'DELETE'});
+    if(r.ok){ showToast('Block deleted','info'); await fetchSlots(); }
+    else { showToast('Delete failed','error'); }
+  } catch(e){ showToast('Network error','error'); }
+}
+
+// ── Quick add ─────────────────────────────────────────────────────
+document.getElementById('q-add-btn').addEventListener('click', async ()=>{
+  const start = document.getElementById('q-start').value;
+  const end   = document.getElementById('q-end').value;
+  const label = document.getElementById('q-label').value.trim() || 'Busy';
+  if(!start||!end){ showToast('Fill start and end','error'); return; }
+  if(timeToMinutes(end)<=timeToMinutes(start)){ showToast('End must be after start','error'); return; }
+  try {
+    const r = await fetch('/api/slots',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ start, end, label, color:COLORS[0], repeatDays:[], date:dateStr(currentDate) })
+    });
+    if(!r.ok){ const d=await r.json(); showToast(d.error||'Error','error'); return; }
+    showToast('Block added','success');
+    document.getElementById('q-label').value='';
+    await fetchSlots();
+  } catch(e){ showToast('Network error','error'); }
+});
+
+// ── Free time search ──────────────────────────────────────────────
+document.getElementById('free-search-btn').addEventListener('click', async ()=>{
+  const dateVal = document.getElementById('free-date').value;
+  const timeVal = document.getElementById('free-time').value;
+  const hours   = parseFloat(document.getElementById('free-hours').value);
+
+  if(!dateVal||!timeVal){ showToast('Fill in date and time','error'); return; }
+  if(isNaN(hours)||hours<=0){ showToast('Enter valid hours','error'); return; }
+
+  const startDt = `${dateVal}T${timeVal}`;
+  const nowIso  = new Date().toISOString().slice(0,16);
+  if(startDt < nowIso){ showToast('Start time is in the past','error'); return; }
+
+  const btn = document.getElementById('free-search-btn');
+  btn.disabled = true; btn.textContent = 'Searching…';
+
+  try {
+    const r = await fetch(`/api/free?start_dt=${encodeURIComponent(startDt)}&hours=${hours}`);
+    const data = await r.json();
+    freeResults = data;
+    renderFreeResults(data);
+    reHighlightFree(data);
+  } catch(e){ showToast('Search failed','error'); }
+  finally { btn.disabled=false; btn.textContent='Search'; }
+});
+
+function renderFreeResults(data){
+  if(!data.allocated.length){
+    freeResults_.innerHTML = '<div class="free-status warn">⚠ No free time found in search range.</div>';
+    return;
+  }
+  // Group by date
+  const byDate = {};
+  data.allocated.forEach(b=>{
+    if(!byDate[b.date]) byDate[b.date] = [];
+    byDate[b.date].push(b);
+  });
+
+  let html = '';
+  if(data.fulfilled){
+    html += `<div class="free-status ok">✓ Found ${data.totalAllocated.toFixed(2)}h of free time</div>`;
+  } else {
+    html += `<div class="free-status warn">⚠ Only found ${data.totalAllocated.toFixed(2)}h (missing ${data.missing.toFixed(2)}h)</div>`;
+  }
+
+  Object.entries(byDate).forEach(([date,blocks])=>{
+    const d = new Date(date+'T00:00:00');
+    const label = isToday(d) ? 'Today' : formatDate(d);
+    html += `<div class="free-day-group">
+      <div class="free-day-header"><span>${label}</span><span>${date}</span></div>`;
+    blocks.forEach(b=>{
+      html += `<div class="free-block-item">
+        <div class="fb-dot"></div>
+        <div class="fb-time">${b.start} – ${b.end}</div>
+        <div class="fb-dur">${b.durationStr}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  freeResults_.innerHTML = html;
+}
+
+// ── Timeline drag-to-create ───────────────────────────────────────
+let dragStartMin = null, dragEndMin = null, isDragging = false;
+
+function yToMinute(y){
+  const rect = timeline.getBoundingClientRect();
+  const relY = y - rect.top + tWrap.scrollTop;
+  return Math.max(0, Math.min(1439, Math.round(relY / 60 * 60)));
+}
+
+function snapTo15(m){ return Math.round(m/15)*15; }
+
+timeline.addEventListener('mousedown', e=>{
+  if(e.target.closest('.busy-block')) return;
+  isDragging = true;
+  dragStartMin = snapTo15(yToMinute(e.clientY));
+  dragEndMin = dragStartMin + 60;
+  dragPreview.style.display = 'block';
+  updateDragPreview();
+});
+
+document.addEventListener('mousemove', e=>{
+  if(!isDragging) return;
+  dragEndMin = snapTo15(yToMinute(e.clientY));
+  if(dragEndMin <= dragStartMin) dragEndMin = dragStartMin + 15;
+  updateDragPreview();
+});
+
+document.addEventListener('mouseup', e=>{
+  if(!isDragging) return;
+  isDragging = false;
+  dragPreview.style.display = 'none';
+  const start = Math.min(dragStartMin, dragEndMin);
+  const end   = Math.max(dragStartMin, dragEndMin);
+  if(end - start >= 15) openAddModal(start, end);
+});
+
+function updateDragPreview(){
+  const s = Math.min(dragStartMin, dragEndMin);
+  const e = Math.max(dragStartMin, dragEndMin);
+  dragPreview.style.top    = `${s}px`;
+  dragPreview.style.height = `${Math.max(e-s,15)}px`;
+}
+
+// ── Scroll to current hour on load ───────────────────────────────
+function scrollToCurrent(){
+  const now = new Date();
+  const m = isToday(currentDate) ? now.getHours()*60+now.getMinutes() : 8*60;
+  tWrap.scrollTop = Math.max(0, m - 120);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+buildGrid();
+setDate(new Date());
+scrollToCurrent();
+setInterval(updateNowLine, 60000);
+</script>
+</body>
+</html>
