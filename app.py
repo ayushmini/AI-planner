@@ -16,8 +16,33 @@ app = Flask(__name__, template_folder='.')
 app.secret_key = 'super_secret_key_timeblocks'
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-busy_slots = []
-_counter = 0
+busy_slots = [
+    {
+        'id': -1,
+        'date': None,
+        'start': '00:00',
+        'end': '06:00',
+        'startMinutes': 0,
+        'endMinutes': 360,
+        'label': 'Sleep',
+        'color': '#4527a0',
+        'repeatDays': [0, 1, 2, 3, 4, 5, 6],
+        'is_gcal': False
+    },
+    {
+        'id': -2,
+        'date': None,
+        'start': '08:30',
+        'end': '17:00',
+        'startMinutes': 510,
+        'endMinutes': 1020,
+        'label': 'Classes',
+        'color': '#2e7d32',
+        'repeatDays': [0, 1, 2, 3, 4],
+        'is_gcal': False
+    }
+]
+_counter = 1
 MAX_SEARCH_DAYS = 60
 last_gcal_sync_time = 0
 GCAL_CACHE_DURATION = 300
@@ -279,6 +304,8 @@ def handle_chat():
     d = request.json or {}
     prompt = d.get('prompt')
     slack = float(d.get('slack', 0.0))
+    start_after = d.get('start_after')
+    session_id = str(int(time.time() * 1000))
     
     system_instruction = f"""
     You are an AI task scheduler assistant. 
@@ -312,7 +339,14 @@ def handle_chat():
         service = get_calendar_service()
         managed_cal_id = get_managed_calendar_id(service) if service else None
         
-        search_start_dt = datetime.now()
+        if start_after:
+            try:
+                search_start_dt = datetime.fromisoformat(start_after)
+            except ValueError:
+                search_start_dt = datetime.now()
+        else:
+            search_start_dt = datetime.now()
+            
         scheduled_events = []
         global _counter
         
@@ -339,25 +373,13 @@ def handle_chat():
                     'label': title,
                     'color': '#7c6aff',
                     'repeatDays': [],
-                    'is_gcal': True if managed_cal_id else False
+                    'is_gcal': False,
+                    'is_pending': True,
+                    'session_id': session_id
                 }
                 busy_slots.append(slot)
                 _counter += 1
                 scheduled_events.append(slot)
-                
-                if service and managed_cal_id:
-                    try:
-                        timezone_str = datetime.now().astimezone().strftime('%z')
-                        tzinfo_formatted = f"{timezone_str[:3]}:{timezone_str[3:]}"
-                        st_dt = f"{d_str}T{s_str}:00{tzinfo_formatted}"
-                        end_dt = f"{d_str}T{e_str}:00{tzinfo_formatted}"
-                        service.events().insert(calendarId=managed_cal_id, body={
-                            'summary': title,
-                            'start': {'dateTime': st_dt},
-                            'end': {'dateTime': end_dt},
-                        }).execute()
-                    except Exception as ex:
-                        print("Failed to sync new event to GCAL", ex)
             
             if allocated:
                 last_block = allocated[-1]
@@ -367,13 +389,49 @@ def handle_chat():
         for ev in scheduled_events:
             friendly_text += f"- **{ev['label']}**: {ev['date']} {ev['start']} - {ev['end']}\n"
             
-        return jsonify({"response": friendly_text, "scheduled": scheduled_events})
+        return jsonify({"response": friendly_text, "scheduled": scheduled_events, "session_id": session_id})
     except Exception as e:
         print("Gemini/Scheduling error:", e)
         return jsonify({"error": "Failed to schedule: " + str(e)}), 500
 
 
 # ---- Standard Routes ----
+
+@app.route('/api/chat/accept', methods=['POST'])
+def accept_chat():
+    session_id = request.json.get('session_id')
+    service = get_calendar_service()
+    managed_cal_id = get_managed_calendar_id(service) if service else None
+
+    accepted = 0
+    for slot in busy_slots:
+        if slot.get('session_id') == session_id and slot.get('is_pending'):
+            slot['is_pending'] = False
+            if service and managed_cal_id:
+                slot['is_gcal'] = True
+            accepted += 1
+            
+            if service and managed_cal_id:
+                try:
+                    timezone_str = datetime.now().astimezone().strftime('%z')
+                    tzinfo_formatted = f"{timezone_str[:3]}:{timezone_str[3:]}"
+                    st_dt = f"{slot['date']}T{slot['start']}:00{tzinfo_formatted}"
+                    end_dt = f"{slot['date']}T{slot['end']}:00{tzinfo_formatted}"
+                    service.events().insert(calendarId=managed_cal_id, body={
+                        'summary': slot['label'],
+                        'start': {'dateTime': st_dt},
+                        'end': {'dateTime': end_dt},
+                    }).execute()
+                except Exception as ex:
+                    print("Failed to sync new event to GCAL", ex)
+    return jsonify({"success": True, "count": accepted})
+
+@app.route('/api/chat/reject', methods=['POST'])
+def reject_chat():
+    global busy_slots
+    session_id = request.json.get('session_id')
+    busy_slots = [s for s in busy_slots if s.get('session_id') != session_id]
+    return jsonify({"success": True})
 
 @app.route('/')
 def index():

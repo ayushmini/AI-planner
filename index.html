@@ -925,9 +925,15 @@
     <div class="ai-msg">Hi! Describe a task you want to schedule. I will break it down into steps and fit it into your free time locally.</div>
   </div>
   <div id="ai-chat-input-area">
-    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text2);">
-      <span>Slack Factor: <span id="slack-val">0.0</span></span>
-      <input type="range" id="slack-slider" min="0" max="0.4" step="0.1" value="0.0" style="width: 100px;">
+    <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px;">
+        <label class="form-label" style="font-size: 10px;">Start After</label>
+        <input type="datetime-local" id="ai-start-datetime" class="form-input" style="font-size: 11px; padding: 4px 6px;">
+      </div>
+      <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px; text-align: right;">
+        <label class="form-label" style="font-size: 10px;">Slack: <span id="slack-val">0.0</span></label>
+        <input type="range" id="slack-slider" min="0" max="0.4" step="0.1" value="0.0" style="width: 100%;">
+      </div>
     </div>
     <div class="ai-input-row">
       <textarea id="ai-prompt" class="form-input" placeholder="e.g. Set up a new GitHub repo over 2 hours..."></textarea>
@@ -1446,6 +1452,7 @@ aiCloseBtn.addEventListener('click', () => aiChatPanel.classList.remove('open'))
 
 async function sendAiMessage() {
   const text = aiPrompt.value.trim();
+  const startAfter = document.getElementById('ai-start-datetime').value;
   if(!text) return;
   
   aiPrompt.value = '';
@@ -1462,10 +1469,15 @@ async function sendAiMessage() {
   aiMessages.scrollTop = aiMessages.scrollHeight;
   
   try {
+    const payload = { 
+      prompt: text, 
+      slack: parseFloat(slackSlider.value),
+      start_after: startAfter || null
+    };
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ prompt: text, slack: parseFloat(slackSlider.value) })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     loadingMsg.remove();
@@ -1476,8 +1488,22 @@ async function sendAiMessage() {
        aMsg.innerText = 'Error: ' + data.error;
     } else {
        aMsg.innerHTML = data.response.replace(/\n/g, '<br>');
-       // refresh slots immediately since backend scheduled them
-       fetchSlots(currentDate);
+       
+       if (data.scheduled && data.scheduled.length > 0) {
+          const actions = document.createElement('div');
+          actions.style.marginTop = '10px';
+          const sessionIdStr = JSON.stringify(data.session_id).replace(/"/g, '&quot;');
+          const containerId = 'actions-' + Date.now();
+          actions.id = containerId;
+          
+          actions.innerHTML = `
+            <button class="btn-primary" style="background: var(--green); margin-right: 5px; width: auto;" onclick="acceptAiEvents(${sessionIdStr}, '${containerId}')">Accept</button>
+            <button class="btn-cancel" style="width: auto;" onclick="rejectAiEvents(${sessionIdStr}, '${containerId}')">Reject & Remove</button>
+          `;
+          aMsg.appendChild(actions);
+       }
+       
+       fetchSlots();
     }
     aiMessages.appendChild(aMsg);
     aiMessages.scrollTop = aiMessages.scrollHeight;
@@ -1485,6 +1511,48 @@ async function sendAiMessage() {
     loadingMsg.innerText = 'Request failed: ' + err.message;
   }
 }
+
+window.acceptAiEvents = async function(sessionId, containerId) {
+    const container = document.getElementById(containerId);
+    if(container) container.innerHTML = '<span style="color: var(--green); font-size: 12px; font-weight: bold;">Accepting & Syncing...</span>';
+    
+    try {
+        const r = await fetch('/api/chat/accept', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId})
+        });
+        if (r.ok) {
+            if(container) container.innerHTML = '<span style="color: var(--green); font-size: 12px; font-weight: bold;">✓ Accepted and sent to Calendar</span>';
+            fetchSlots();
+        } else {
+            if(container) container.innerHTML = '<span class="error-msg">Failed to accept.</span>';
+        }
+    } catch (e) {
+        if(container) container.innerHTML = '<span class="error-msg">Error details.</span>';
+    }
+};
+
+window.rejectAiEvents = async function(sessionId, containerId) {
+    const container = document.getElementById(containerId);
+    if(container) container.innerHTML = '<span style="color: var(--red); font-size: 12px; font-weight: bold;">Rejecting...</span>';
+    
+    try {
+        const r = await fetch('/api/chat/reject', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId})
+        });
+        if (r.ok) {
+            if(container) container.innerHTML = '<span style="color: var(--red); font-size: 12px; font-weight: bold;">✕ Rejected and removed</span>';
+            fetchSlots();
+        } else {
+            if(container) container.innerHTML = '<span class="error-msg">Failed to reject.</span>';
+        }
+    } catch (e) {
+        if(container) container.innerHTML = '<span class="error-msg">Error.</span>';
+    }
+};
 
 aiSendBtn.addEventListener('click', sendAiMessage);
 aiPrompt.addEventListener('keydown', e => {
