@@ -147,9 +147,7 @@ def test_agent_creates_pending_plan_and_confirm(monkeypatch):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return "[]"
-        if call_count == 2:
-            return "plan"
+            return '{"facts": [], "intent": "plan"}'
         return """
         {
           "goal": "Study GitHub and interview basics",
@@ -231,9 +229,7 @@ def test_agent_default_start_snaps_to_30_minutes(monkeypatch):
         nonlocal call_count
         call_count += 1
         if call_count == 1:
-            return "[]"
-        if call_count == 2:
-            return "plan"
+            return '{"facts": [], "intent": "plan"}'
         return """
         {
           "goal": "Quick task",

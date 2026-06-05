@@ -48,75 +48,63 @@ def _build_user_block(prompt: str, history: str, memories: list[str], facts: lis
     return "\n\n".join(parts)
 
 
-class FactAgent:
-    def extract(self, prompt: str, history: str) -> list[str]:
-        system = """Extract scheduling-relevant facts from the user's message and conversation.
-Return a JSON array of short factual strings (1-2 lines each).
-Extract:
-- Study subjects and topics (e.g. "Studying maths: eigenvalues and matrix inverse")
-- Time constraints and preferences (e.g. "Has 5 days to prepare", "Prefers 2hr sessions")
-- Goals and deadlines (e.g. "Exam on June 12 at 9:30 AM", "Wants 15-20 total hours")
-- Any other concrete scheduling-relevant details
-Return [] if there are no extractable facts."""
+def _save_facts(db: Session, user: User, facts: list[str]) -> int:
+    """Persist new facts to the Memory table, deduplicating against existing ones."""
+    existing = {m.content.lower().strip() for m in
+                 db.exec(select(Memory).where(Memory.user_id == user.id, Memory.type == "fact")).all()}
+    saved = 0
+    for fact in facts:
+        normalized = fact.lower().strip()
+        if normalized not in existing:
+            db.add(Memory(user_id=user.id, type="fact", content=fact.strip()))
+            existing.add(normalized)
+            saved += 1
+    if saved:
+        db.commit()
+    return saved
+
+
+class TriageAgent:
+    """Single LLM call that extracts facts AND classifies intent (replaces FactAgent + ClassifierAgent)."""
+
+    def triage(self, prompt: str, memories: list[str], history: str = "", facts: list[str] | None = None) -> dict:
+        system = """You are a scheduling assistant. Perform TWO tasks in a single response.
+
+TASK 1 — EXTRACT FACTS: Pull out any NEW scheduling-relevant facts from the user's latest message.
+Include: study subjects/topics, time constraints, goals, deadlines, session preferences.
+Only extract facts NOT already listed in the known facts. Return an empty list if nothing new.
+
+TASK 2 — CLASSIFY INTENT: Classify the user's latest message into exactly ONE category:
+- "plan": User wants to schedule AND enough detail exists (subject, duration, timeframe) — in this message or accumulated across history/facts.
+- "clarify": User mentions something schedulable but key details are still missing. When in doubt, choose this.
+- "chat": Message is PURELY off-topic with zero connection to planning. Use this rarely.
+
+Return JSON only:
+{"facts": ["new fact 1", "new fact 2"], "intent": "plan|clarify|chat"}"""
         content = llm_client.chat_completion(
             [
                 {"role": "system", "content": system},
-                {"role": "user", "content": f"Conversation:\n{history}\n\nLatest message: {prompt}" if history else f"Message: {prompt}"},
+                {"role": "user", "content": _build_user_block(prompt, history, memories, facts or [])},
             ],
             response_format={"type": "json_object"},
             temperature=0.0,
         )
         try:
             parsed = json.loads(content)
-            if isinstance(parsed, list):
-                return [str(f) for f in parsed if f]
-            if isinstance(parsed, dict) and "facts" in parsed:
-                return [str(f) for f in parsed["facts"] if f]
-        except (json.JSONDecodeError, TypeError):
-            pass
-        return []
-
-    def save_facts(self, db: Session, user: User, facts: list[str]) -> int:
-        existing = {m.content.lower().strip() for m in
-                     db.exec(select(Memory).where(Memory.user_id == user.id, Memory.type == "fact")).all()}
-        saved = 0
-        for fact in facts:
-            normalized = fact.lower().strip()
-            if normalized not in existing:
-                db.add(Memory(user_id=user.id, type="fact", content=fact.strip()))
-                existing.add(normalized)
-                saved += 1
-        if saved:
-            db.commit()
-        return saved
-
-
-class ClassifierAgent:
-    def classify(self, prompt: str, memories: list[str], history: str = "", facts: list[str] | None = None) -> str:
-        system = """You are a message classifier for a SCHEDULING application.
-Classify the user's LATEST message into exactly ONE category:
-- "plan": The user wants to schedule or plan tasks/study time AND enough detail exists (subject, duration/hours, timeframe) — either in this message or accumulated across the conversation history and known facts.
-- "clarify": The user mentions studying, learning, preparing, or any schedulable activity, but key details are still missing (e.g. duration, timeframe, or topic). Also use this when the user provides new info that adds to an ongoing planning conversation.
-- "chat": The message is PURELY off-topic (greetings, thanks, or completely unrelated). Use this ONLY when the message has zero connection to planning or studying.
-
-IMPORTANT: This is a scheduling app. When in doubt between "clarify" and "chat", choose "clarify".
-Review ALL conversation history and known facts before deciding. If enough detail has accumulated across messages, classify as "plan".
-Return ONLY the category word, nothing else."""
-        content = llm_client.chat_completion(
-            [
-                {"role": "system", "content": system},
-                {"role": "user", "content": _build_user_block(prompt, history, memories, facts or [])},
-            ],
-            temperature=0.0,
-        )
-        result = content.strip().lower().strip('"').strip("'")
-        if result not in ("plan", "clarify", "chat"):
-            if "clarif" in result:
-                return "clarify"
-            if "plan" in result or "schedul" in result:
-                return "plan"
-            return "chat"
-        return result
+            facts_list = parsed.get("facts", [])
+            if not isinstance(facts_list, list):
+                facts_list = []
+            intent = str(parsed.get("intent", "chat")).strip().lower().strip('"').strip("'")
+            if intent not in ("plan", "clarify", "chat"):
+                if "clarif" in intent:
+                    intent = "clarify"
+                elif "plan" in intent or "schedul" in intent:
+                    intent = "plan"
+                else:
+                    intent = "chat"
+            return {"facts": [str(f) for f in facts_list if f], "intent": intent}
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return {"facts": [], "intent": "chat"}
 
 
 class ChatAgent:
@@ -308,16 +296,17 @@ def run_roadmap_agent(session: Session, user: User, prompt: str, start_after: st
     memories = [memory.content for memory in memory_service.retrieve_memories(session, user, prompt)]
     facts = _load_facts(session, user.id)
 
-    fact_agent = FactAgent()
-    new_facts = fact_agent.extract(prompt, history)
+    # Single LLM call: extract facts + classify intent
+    triage = TriageAgent().triage(prompt, memories, history, facts)
+    new_facts = triage["facts"]
+    intent = triage["intent"]
+
     if new_facts:
-        fact_agent.save_facts(session, user, new_facts)
+        _save_facts(session, user, new_facts)
         facts = new_facts + facts
 
     session.add(AgentMessage(user_id=user.id, session_id=session_id, role="user", content=prompt))
     session.commit()
-
-    intent = ClassifierAgent().classify(prompt, memories, history, facts)
 
     if intent == "chat":
         response = ChatAgent().respond(prompt, memories, history, facts)
