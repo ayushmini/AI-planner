@@ -1044,8 +1044,7 @@
   <div id="ai-chat-input-area">
     <div style="display: flex; gap: 12px; margin-bottom: 8px;">
       <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px;">
-        <label class="form-label" style="font-size: 10px;">Start After</label>
-        <input type="datetime-local" id="ai-start-datetime" class="form-input" style="font-size: 11px; padding: 4px 6px;">
+        <label class="form-label" style="font-size: 10px;">Start After: <span id="ai-start-display" style="font-weight: 500;"></span></label>
       </div>
       <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 4px; text-align: right;">
         <label class="form-label" style="font-size: 10px;">Slack: <span id="slack-val">0.0</span></label>
@@ -1439,12 +1438,27 @@ function escHtml(s){
 }
 
 // ── Date navigation ───────────────────────────────────────────────
+function getAiStartAfter(){
+  const dateVal = document.getElementById('free-date').value;
+  const timeVal = document.getElementById('free-time').value;
+  if(!dateVal || !timeVal) return null;
+  return `${dateVal}T${timeVal}`;
+}
+
+function updateAiStartDisplay(){
+  const el = document.getElementById('ai-start-display');
+  if(!el) return;
+  const v = getAiStartAfter();
+  el.textContent = v ? v : 'now';
+}
+
 function setDate(d){
   currentDate = new Date(d); currentDate.setHours(0,0,0,0);
   const ds = dateStr(currentDate);
   dateDisplay.textContent = formatDate(currentDate);
   datePicker.value = ds;
   document.getElementById('free-date').value = ds;
+  updateAiStartDisplay();
   fetchSlots();
   updateNowLine();
 }
@@ -1703,6 +1717,8 @@ function renderFreeResults(data){
   freeResults_.innerHTML = html;
 }
 
+document.getElementById('free-time').addEventListener('change', updateAiStartDisplay);
+
 // ── Timeline drag-to-create ───────────────────────────────────────
 let dragStartMin = null, dragEndMin = null, isDragging = false;
 
@@ -1772,8 +1788,15 @@ aiCloseBtn.addEventListener('click', () => aiChatPanel.classList.remove('open'))
 
 async function sendAiMessage() {
   const text = aiPrompt.value.trim();
-  const startAfter = document.getElementById('ai-start-datetime').value;
+  const startAfter = getAiStartAfter();
   if(!text) return;
+  if(startAfter){
+    const nowIso = dateTimeLocalStr(new Date());
+    if(startAfter < nowIso){
+      showToast('Start time is in the past','error');
+      return;
+    }
+  }
   
   aiPrompt.value = '';
   

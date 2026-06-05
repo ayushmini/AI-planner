@@ -213,7 +213,7 @@ def set_default_blocks_enabled(session: Session, user: User, enabled: bool) -> d
     user.default_blocks_enabled = bool(enabled)
     session.add(user)
     if enabled:
-        existing_defaults = [b for b in user_blocks(session, user.id) if b.is_default and b.preset_source == "default"]
+        existing_defaults = [b for b in user_blocks(session, user.id) if b.is_default]
         if not existing_defaults:
             for block in DEFAULT_BLOCKS:
                 create_block(session, user, block, is_default=True, preset_source="default", skip_overlap=True)

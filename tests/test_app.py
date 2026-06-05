@@ -1,6 +1,7 @@
 import os
 import tempfile
 import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 
 TEST_DB = Path(tempfile.gettempdir()) / f"ai_visual_scheduler_{uuid.uuid4().hex}.db"
@@ -10,9 +11,13 @@ os.environ["NVIDIA_API_KEY"] = "test-nvidia-key"
 os.environ["GOOGLE_TOKEN_DIR"] = str(TEST_DB.parent / f"google_tokens_{uuid.uuid4().hex}")
 
 from fastapi.testclient import TestClient
+from sqlmodel import Session
 
+from app.db.models import User
+from app.db.session import create_db_and_tables, engine
 from app.main import app
-from app.db.session import create_db_and_tables
+from app.services import scheduler_service
+from app.services.time_utils import snap_to_30_min
 
 create_db_and_tables()
 
@@ -169,3 +174,68 @@ def test_agent_creates_pending_plan_and_confirm(monkeypatch):
     confirmed = client.post("/api/agent/confirm", json={"session_id": data["session_id"]})
     assert confirmed.status_code == 200
     assert confirmed.json()["count"] == 1
+
+
+def test_reenabling_defaults_with_preset_does_not_duplicate():
+    client = signup_client()
+    client.put("/api/settings/default-blocks", json={"enabled": False})
+    client.post("/api/presets/student/apply", json={"clear_existing": True})
+    client.put("/api/settings/default-blocks", json={"enabled": True})
+
+    user_id = client.get("/api/me").json()["id"]
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        all_blocks = scheduler_service.user_blocks(session, user.id)
+        built_in_defaults = [b for b in all_blocks if b.preset_source == "default"]
+        assert built_in_defaults == [], (
+            "Re-enabling defaults should not add built-in Sleep/Classes on top of an active preset. "
+            f"Found: {[(b.label, b.start, b.end) for b in built_in_defaults]}"
+        )
+
+
+def test_snap_to_30_min():
+    assert snap_to_30_min(datetime(2026, 6, 4, 14, 0)) == datetime(2026, 6, 4, 14, 0)
+    assert snap_to_30_min(datetime(2026, 6, 4, 14, 30)) == datetime(2026, 6, 4, 14, 30)
+    assert snap_to_30_min(datetime(2026, 6, 4, 14, 15)) == datetime(2026, 6, 4, 14, 30)
+    assert snap_to_30_min(datetime(2026, 6, 4, 14, 45)) == datetime(2026, 6, 4, 15, 0)
+    assert snap_to_30_min(datetime(2026, 6, 4, 23, 45)) == datetime(2026, 6, 5, 0, 0)
+    assert snap_to_30_min(datetime(2026, 6, 4, 14, 0, 33)) == datetime(2026, 6, 4, 14, 0)
+
+
+def test_free_time_default_start_snaps_to_30_minutes():
+    client = signup_client()
+    client.put("/api/settings/default-blocks", json={"enabled": False})
+    response = client.get("/api/free?hours=0.5")
+    assert response.status_code == 200
+    allocated = response.json()["allocated"]
+    assert allocated, "Expected at least one allocated block"
+    start_minutes = allocated[0]["startMinutes"]
+    assert start_minutes % 30 == 0, f"Expected start snapped to 30-min mark, got {start_minutes}"
+
+
+def test_agent_default_start_snaps_to_30_minutes(monkeypatch):
+    client = signup_client()
+    client.put("/api/settings/default-blocks", json={"enabled": False})
+
+    from app.agents import roadmap_agent
+
+    def fake_completion(messages, provider="nvidia_nim", response_format=None, temperature=0.2):
+        return """
+        {
+          "goal": "Quick task",
+          "days": [{"day": 1, "focus": "Topic", "tasks": [{"title": "Task", "duration_minutes": 30}]}]
+        }
+        """
+
+    monkeypatch.setattr(roadmap_agent.llm_client, "chat_completion", fake_completion)
+
+    response = client.post(
+        "/api/agent/chat",
+        json={"prompt": "Plan a single short task", "slack": 0.0},
+    )
+    assert response.status_code == 200, response.text
+    scheduled_date = response.json()["scheduled"][0]["date"]
+    expected = snap_to_30_min(datetime.now()).date()
+    assert scheduled_date == expected.isoformat(), (
+        f"Expected agent to start on snapped date {expected}, got {scheduled_date}"
+    )

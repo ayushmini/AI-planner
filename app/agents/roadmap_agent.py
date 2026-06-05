@@ -7,7 +7,7 @@ from sqlmodel import Session
 from app.db.models import AgentMessage, AgentSession, User
 from app.agents import tools as agent_tools
 from app.services import llm_client, memory_service
-from app.services.time_utils import parse_positive_float
+from app.services.time_utils import parse_positive_float, snap_to_30_min
 
 
 class PlannerAgent:
@@ -43,7 +43,7 @@ class CurriculumAgent:
 
 class SchedulerAgent:
     def schedule(self, session: Session, user: User, plan: dict, session_id: str, start_after: str | None = None, slack: float = 0.0) -> list[dict]:
-        search_start = datetime.fromisoformat(start_after) if start_after else datetime.now()
+        search_start = datetime.fromisoformat(start_after) if start_after else snap_to_30_min(datetime.now())
         scheduled = []
         for day in plan["days"]:
             date = (search_start.date() + timedelta(days=int(day.get("day", 1)) - 1)).isoformat()
