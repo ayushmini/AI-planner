@@ -1,7 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 MIN_FREE_BLOCK_MINUTES = 30
 MAX_SEARCH_DAYS = 60
+
+
+def snap_to_30_min(dt: datetime) -> datetime:
+    dt = dt.replace(second=0, microsecond=0)
+    if dt.minute in (0, 30):
+        return dt
+    if dt.minute < 30:
+        return dt.replace(minute=30)
+    return (dt + timedelta(hours=1)).replace(minute=0)
 
 
 def time_to_minutes(t: str) -> int:

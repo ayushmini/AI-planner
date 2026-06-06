@@ -8,7 +8,7 @@ from app.db.models import User
 from app.db.session import get_session
 from app.schemas.scheduler import BlockRequest, DefaultBlocksRequest
 from app.services import auth_service, calendar_service, scheduler_service
-from app.services.time_utils import parse_positive_float
+from app.services.time_utils import parse_positive_float, snap_to_30_min
 
 router = APIRouter(prefix="/api", tags=["scheduler"])
 
@@ -88,7 +88,7 @@ def get_free(
     user: User = Depends(auth_service.get_current_user),
 ):
     calendar_service.sync_gcal_events(session, user)
-    start = start_dt or datetime.now().isoformat(timespec="minutes")
+    start = start_dt or snap_to_30_min(datetime.now()).isoformat(timespec="minutes")
     parsed_hours = parse_positive_float(hours, 1.0)
     try:
         return scheduler_service.compute_free_blocks(session, user, start, parsed_hours)
