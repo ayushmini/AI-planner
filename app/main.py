@@ -20,6 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Predestination - AI Visual Scheduler", lifespan=lifespan)
 ROOT_DIR = Path(__file__).resolve().parents[1]
 INDEX_PATH = ROOT_DIR / "index.html"
+LANDING_PATH = ROOT_DIR / "landing.html"
 
 
 @app.exception_handler(HTTPException)
@@ -35,6 +36,11 @@ def health():
 @app.get("/", response_class=HTMLResponse)
 def index():
     return FileResponse(INDEX_PATH)
+
+
+@app.get("/home", response_class=HTMLResponse)
+def home():
+    return FileResponse(LANDING_PATH)
 
 
 app.include_router(auth.router)

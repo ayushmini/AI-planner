@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Predestination — Welcome</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;500;600;700;800;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── CSS Variables ─────────────────────────────────────────────── */
+  :root {
+    --bg:        #0e0e10;
+    --surface:   #151518;
+    --surface2:  #1c1c20;
+    --border:    #2c2c34;
+    --text:      #e2e2ea;
+    --text2:     #8a8aa0;
+    --accent:    #6c5ce7;
+    --accent2:   #a29bfe;
+    --accent-bg: rgba(108,92,231,.08);
+    --red:       #e17055;
+    --radius:    3px;
+    --trans:     .15s ease;
+  }
+  [data-theme="light"] {
+    --bg:       #e8e8ec;
+    --surface:  #f2f2f5;
+    --surface2: #eaeaed;
+    --border:   #c5c5d0;
+    --text:     #1a1a2e;
+    --text2:    #55556e;
+    --accent:   #5b4de0;
+    --accent2:  #7c6af0;
+    --accent-bg: rgba(91,77,224,.08);
+    --red:       #d63031;
+  }
+
+  /* ── Reset ─────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  button { cursor: pointer; font-family: inherit; }
+  input { font-family: inherit; }
+
+  /* ── Layout ────────────────────────────────────────────────────── */
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    max-width: 800px;
+    padding: 32px;
+    text-align: center;
+  }
+
+  .hero-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 42px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -1px;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+  .hero-subtitle {
+    font-size: 18px;
+    color: var(--text2);
+    max-width: 500px;
+    margin-top: 16px;
+  }
+
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    width: 360px;
+    text-align: left;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .form-row { margin-bottom: 16px; }
+  .form-col { display: flex; flex-direction: column; gap: 6px; }
+  .form-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    font-family: 'Unbounded', sans-serif;
+  }
+  .form-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    padding: 10px;
+    font-size: 14px;
+    width: 100%;
+    transition: border-color var(--trans);
+  }
+  .form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .auth-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    flex: 1;
+    transition: background var(--trans);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    flex: 1;
+    transition: background var(--trans), color var(--trans);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .btn-secondary:hover {
+    background: var(--border);
+    color: var(--text);
+  }
+
+  .error-msg {
+    color: var(--red);
+    font-size: 12px;
+    margin-top: 12px;
+    text-align: center;
+  }
+  
+  .features {
+    display: flex;
+    gap: 24px;
+    margin-top: 32px;
+    text-align: left;
+  }
+  .feature-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    border-radius: var(--radius);
+    flex: 1;
+  }
+  .feature-box h3 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .feature-box p {
+    color: var(--text2);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container" id="main-content" style="display: none;">
+  <div>
+    <div class="hero-title">Predestination</div>
+    <div class="hero-subtitle">The AI-powered visual scheduler for your day. Log in to access your blocks, memory, and personalized planner.</div>
+  </div>
+
+  <div class="auth-card">
+    <div class="form-row">
+      <div class="form-col">
+        <label class="form-label">Email</label>
+        <input type="email" id="auth-email" class="form-input" autocomplete="email" placeholder="you@example.com">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-col">
+        <label class="form-label">Password</label>
+        <input type="password" id="auth-password" class="form-input" autocomplete="current-password" placeholder="At least 8 characters">
+      </div>
+    </div>
+    <div class="auth-actions">
+      <button class="btn-primary" id="auth-login-btn">Log In</button>
+      <button class="btn-secondary" id="auth-signup-btn">Sign Up</button>
+    </div>
+    <div id="auth-error" class="error-msg"></div>
+  </div>
+  
+  <div class="features">
+    <div class="feature-box">
+      <h3>AI Planning</h3>
+      <p>Let an AI assistant organize your tasks into free slots seamlessly.</p>
+    </div>
+    <div class="feature-box">
+      <h3>GCal Sync</h3>
+      <p>Connect your Google Calendar and keep everything perfectly synced in real time.</p>
+    </div>
+    <div class="feature-box">
+      <h3>Presets</h3>
+      <p>Save recurring schedules like 'Exam Prep' or 'Fitness' and apply them instantly.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const authEmail = document.getElementById('auth-email');
+const authPassword = document.getElementById('auth-password');
+const authError = document.getElementById('auth-error');
+const mainContent = document.getElementById('main-content');
+
+async function checkAuth() {
+  try {
+    const r = await fetch('/api/me');
+    if (r.ok) {
+      window.location.href = '/';
+      return;
+    }
+  } catch (e) {
+    // Ignore error, proceed to show login
+  }
+  mainContent.style.display = 'flex';
+}
+
+async function readApiError(response, fallback='Request failed') {
+  try {
+    const data = await response.json();
+    if (data.detail) {
+      if (Array.isArray(data.detail)) {
+        return data.detail[0].msg || fallback;
+      }
+      return data.detail;
+    }
+    return data.error || fallback;
+  } catch(e) {
+    return fallback;
+  }
+}
+
+async function submitAuth(mode) {
+  const email = authEmail.value.trim();
+  const password = authPassword.value;
+  authError.textContent = '';
+  
+  if(!email || !password){
+    authError.textContent = 'Email and password are required.';
+    return;
+  }
+  
+  try {
+    const r = await fetch(`/api/auth/${mode}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    
+    if(!r.ok){
+      authError.textContent = await readApiError(r, 'Could not sign in.');
+      return;
+    }
+    
+    // Success, redirect to main app
+    window.location.href = '/';
+  } catch(e) {
+    authError.textContent = 'Network error.';
+  }
+}
+
+document.getElementById('auth-login-btn').addEventListener('click', ()=>submitAuth('login'));
+document.getElementById('auth-signup-btn').addEventListener('click', ()=>submitAuth('signup'));
+authPassword.addEventListener('keydown', e => {
+  if(e.key === 'Enter') submitAuth('login');
+});
+
+// Run auth check on load
+checkAuth();
+</script>
+</body>
+</html>

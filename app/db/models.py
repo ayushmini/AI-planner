@@ -51,7 +51,11 @@ class AgentSession(SQLModel, table=True):
     provider: str = "nvidia_nim"
     status: str = "pending"
     summary: str = ""
+    title: str = ""                        # Auto-named from conversation (e.g. "Redis 7-day plan")
+    calendar_snapshot: str = ""            # Calendar state at session start
     created_at: datetime = Field(default_factory=utc_now)
+    last_accessed_at: datetime = Field(default_factory=utc_now)   # Updated every time the session is resumed
+    finished_at: Optional[datetime] = Field(default=None)          # Set when confirmed or rejected
 
 
 class AgentMessage(SQLModel, table=True):
@@ -66,8 +70,9 @@ class AgentMessage(SQLModel, table=True):
 class Memory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
-    type: str = Field(index=True)
+    type: str = Field(index=True)     # "fact" (session-scoped) | "pref" (permanent user preference)
     content: str
+    chat_session_id: Optional[str] = Field(default=None, index=True)  # None = permanent pref; set = session fact
     created_at: datetime = Field(default_factory=utc_now)
     last_used_at: datetime = Field(default_factory=utc_now)
 

@@ -51,6 +51,7 @@ GOOGLE_OAUTH_REDIRECT_URI=
 - Free-time search that ignores gaps shorter than 30 minutes.
 - Built-in presets: Blank, Student, Exam Prep, Working Professional, and Fitness + Study.
 - Custom presets saved permanently in the database.
+- Lightweight Web Knowledge Agent that automatically searches DuckDuckGo, scrapes content, and summarizes web results in pure Python for dynamic knowledge injection.
 - Pure-Python NVIDIA NIM agent flow that creates pending blocks first, then commits only after confirmation.
 - Persistent agent sessions with conversation history carried across follow-up messages.
 - Long-term user memory: facts extracted from conversations are saved and reused across sessions.
@@ -71,7 +72,7 @@ TriageAgent (1 LLM call)
   │
   ▼
 Response agent (1 LLM call)
-  ├─ ChatAgent     → brief scheduling-focused reply
+  ├─ ChatAgent     → brief scheduling-focused reply (injects Web Knowledge via search/scrape/summarize pipeline if needed)
   ├─ ClarifyAgent  → polite follow-up questions (never re-asks answered questions)
   └─ PlannerAgent  → structured JSON roadmap
         │
@@ -122,6 +123,8 @@ app.py        Local dev runner
 - `POST /api/agent/chat`
 - `POST /api/agent/confirm`
 - `POST /api/agent/reject`
+- `POST /api/agent/new-session`
+- `GET /api/agent/sessions`
 - `GET /api/memory`
 - `POST /api/memory`
 - `DELETE /api/memory/{memory_id}`
