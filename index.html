@@ -232,20 +232,30 @@
     left: 60px;
     right: 8px;
     border-radius: var(--radius);
-    padding: 5px 10px;
+    padding: 5px 10px 5px 14px;
     overflow: hidden;
     cursor: pointer;
     transition: filter var(--trans), transform var(--trans), box-shadow var(--trans);
     display: flex;
     flex-direction: column;
     gap: 1px;
-    border: 1px solid rgba(255,255,255,.1);
+    border: 1px solid rgba(0,0,0,.15);
+    border-left: 3px solid rgba(255,255,255,.5);
     z-index: 4;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  .busy-block::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,.12) 0%, transparent 50%, rgba(0,0,0,.1) 100%);
+    pointer-events: none;
   }
   .busy-block:hover {
     filter: brightness(1.12);
     transform: translateX(2px);
-    box-shadow: -2px 0 0 0 rgba(255,255,255,.15), var(--shadow);
+    box-shadow: -2px 0 0 0 rgba(255,255,255,.25), 0 2px 8px rgba(0,0,0,.25);
   }
   .busy-block .blk-label {
     font-size: 12px;
@@ -1947,8 +1957,8 @@ function renderBlocks(){
       const el = document.createElement('div');
       el.className = 'busy-block' + (slot.is_pending ? ' pending-block' : '');
       el.dataset.id = slot.id;
-      el.style.top = `${slot.startMinutes}px`;
-      el.style.height = `${heightPx(slot.endMinutes-slot.startMinutes)}px`;
+      el.style.top = `${slot.startMinutes + 1}px`;
+      el.style.height = `${Math.max(20, heightPx(slot.endMinutes-slot.startMinutes) - 3)}px`;
       el.style.background = slot.color;
       if(totalCols > 1){
         const w = (1/totalCols)*100;
